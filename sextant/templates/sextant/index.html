@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load i18n static %}
+
+{% block title %}{% trans "Sextant Assistant" %}{% endblock %}
+
+{% block page_header %}
+  <hr class="header_rule">
+{% endblock %}
+
+{% block main %}
+<link rel="stylesheet" href="{% static 'sextant/css/assistant.css' %}">
+
+<div id="sextant-assistant" class="sextant-assistant">
+  <div class="sextant-intro">
+    <p>{% trans "Read-only assistant. It inspects your cloud with your own credentials and never changes anything." %}</p>
+    <p class="sextant-examples">
+      {% trans "Try:" %}
+      <button class="sextant-example" type="button">Why can't I reach instance &lt;id&gt;?</button>
+      <button class="sextant-example" type="button">Which compute hosts are near capacity?</button>
+      <button class="sextant-example" type="button">List all instances in ERROR state</button>
+    </p>
+  </div>
+
+  <div id="sextant-log" class="sextant-log" aria-live="polite"></div>
+
+  <form id="sextant-form" class="sextant-form">
+    <textarea id="sextant-input" rows="2" placeholder="{% trans 'Ask about your cloud…' %}"></textarea>
+    <button id="sextant-send" type="submit" class="btn btn-primary">{% trans "Send" %}</button>
+  </form>
+</div>
+
+<script>
+  window.SEXTANT_STREAM_URL = "{% url 'horizon:sextant:assistant:stream' %}";
+</script>
+<script src="{% static 'sextant/js/assistant.js' %}"></script>
+{% endblock %}

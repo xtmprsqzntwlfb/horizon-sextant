@@ -1,0 +1,3 @@
+# The plugin runs inside a Horizon deployment (which provides Django, horizon,
+# and openstack_dashboard). The only extra runtime dependency is the SDK:
+anthropic>=1.0.0
