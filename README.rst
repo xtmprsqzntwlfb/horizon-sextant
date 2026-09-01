@@ -1,6 +1,6 @@
-========================
+===============
 horizon-sextant
-========================
+===============
 
 A **read-only AI ops assistant** packaged as an OpenStack Horizon plugin. It adds
 a *Sextant* dashboard with a single *Assistant* panel — a chat box where operators
@@ -13,7 +13,7 @@ Design goals
 * **Encapsulated** — a standalone dashboard/panel plugin; it does not patch or
   modify any existing Horizon dashboard.
 * **Read-only** — the tools only *list* and *describe*. The agent never creates,
-  modifies, or deletes anything. When a fix is needed it points the operator to
+  modifies or deletes anything. When a fix is needed it points the operator to
   the Horizon panel to do it themselves.
 * **Auth inherited** — every OpenStack call runs with the logged-in operator's
   Keystone token and scope (the Django ``request``). RBAC/policy is enforced
@@ -40,11 +40,11 @@ Installation
 Prerequisites
 -------------
 
-* A running OpenStack **Horizon** deployment you can restart (devstack, or a
+* A running OpenStack **Horizon** deployment you can restart (devstack or a
   packaged install).
 * Shell access to the host, and permission to edit Horizon's settings and
   restart its web server.
-* The **Python environment Horizon runs under** (its virtualenv, or the system
+* The **Python environment Horizon runs under** (its virtualenv or the system
   Python for packaged installs). Every command below must use *that* interpreter
   and pip — installing Sextant into a different environment will not work.
 * An **Anthropic API key** with access to the configured model.
