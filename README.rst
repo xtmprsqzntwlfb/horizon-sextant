@@ -37,25 +37,89 @@ Tools (all read-only):
 Installation
 ============
 
-1. Install the package into the same environment as Horizon::
+Prerequisites
+-------------
+
+* A running OpenStack **Horizon** deployment you can restart (devstack, or a
+  packaged install).
+* Shell access to the host, and permission to edit Horizon's settings and
+  restart its web server.
+* The **Python environment Horizon runs under** (its virtualenv, or the system
+  Python for packaged installs). Every command below must use *that* interpreter
+  and pip — installing Sextant into a different environment will not work.
+* An **Anthropic API key** with access to the configured model.
+
+Throughout, two paths depend on your deployment. Find yours before you start:
+
+* ``<horizon-src>`` — the Horizon source tree containing ``manage.py`` and the
+  ``openstack_dashboard/`` package.
+
+  * devstack: ``/opt/stack/horizon``
+  * packaged (RHEL/CentOS): ``/usr/share/openstack-dashboard``
+  * packaged (Ubuntu/Debian): ``/usr/share/openstack-dashboard``
+
+* ``<local-settings>`` — Horizon's editable settings file.
+
+  * devstack: ``/opt/stack/horizon/openstack_dashboard/local/local_settings.py``
+  * packaged (RHEL): ``/etc/openstack-dashboard/local_settings``
+  * packaged (Ubuntu): ``/etc/openstack-dashboard/local_settings.py``
+
+Steps
+-----
+
+1. **Install the package into Horizon's Python environment.** From this repo's
+   root (activate Horizon's virtualenv first if it has one)::
 
      pip install .
 
-2. Enable the plugin by copying the enabled file into your Horizon deployment::
+2. **Register the plugin.** Horizon auto-discovers plugins from "enabled" files.
+   Copy Sextant's into Horizon's local enabled directory::
 
      cp sextant/enabled/_9010_sextant.py \
-        <horizon>/openstack_dashboard/local/enabled/
+        <horizon-src>/openstack_dashboard/local/enabled/
 
-3. Configure credentials in ``local_settings.py``::
+   (The ``_9010_`` prefix controls load order; leave it unless it collides with
+   an existing file.)
+
+3. **Configure the API key.** Add to ``<local-settings>``::
 
      SEXTANT = {
-         "api_key": "sk-ant-...",      # or set ANTHROPIC_API_KEY in the env
-         "model": "claude-opus-5",     # optional
-         "effort": "high",             # low | medium | high | xhigh | max
-         "max_iterations": 8,
+         "api_key": "sk-ant-...",      # or omit and set ANTHROPIC_API_KEY in the env
+         "model": "claude-opus-5",     # optional; this is the default
+         "effort": "high",             # optional: low | medium | high | xhigh | max
+         "max_iterations": 8,          # optional: tool-call rounds per question
      }
 
-4. Restart the Horizon web server. The *Sextant* dashboard appears in the nav.
+   The key stays server-side and is never sent to the browser. If you prefer,
+   drop ``api_key`` and export ``ANTHROPIC_API_KEY`` in the web server's
+   environment instead.
+
+4. **Collect and compress static assets** so the panel's JS/CSS are served.
+   Run from ``<horizon-src>`` with Horizon's interpreter::
+
+     cd <horizon-src>
+     python manage.py collectstatic --noinput
+     python manage.py compress --force
+
+   (Skipping this is the most common reason the panel loads blank.)
+
+5. **Restart the Horizon web server.** Whichever your deployment uses::
+
+     sudo systemctl restart httpd          # RHEL/CentOS/Fedora (Apache)
+     # or
+     sudo systemctl restart apache2        # Ubuntu/Debian (Apache)
+
+6. **Verify.** Log in to Horizon as an admin-capable user. A **Sextant**
+   dashboard appears in the left nav with an **Assistant** panel. Open it and
+   ask, e.g., *"list all instances in ERROR state"*. If the tools error, see the
+   note under Requirements about ``api.*`` version differences.
+
+Upgrading or uninstalling
+-------------------------
+
+* **Upgrade**: ``pip install --upgrade .``, then re-run step 4 and restart.
+* **Uninstall**: remove ``<horizon-src>/openstack_dashboard/local/enabled/_9010_sextant.py``,
+  ``pip uninstall horizon-sextant``, re-run step 4, and restart.
 
 Requirements & assumptions
 ==========================
