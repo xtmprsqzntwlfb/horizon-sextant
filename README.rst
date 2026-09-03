@@ -37,51 +37,52 @@ Tools (all read-only):
 Installation
 ============
 
-Prerequisites
--------------
+These steps assume a **source checkout of Horizon** (e.g. devstack) with the
+``horizon`` and ``horizon-sextant`` trees side by side::
 
-* A running OpenStack **Horizon** deployment you can restart (devstack or a
-  packaged install).
-* Shell access to the host, and permission to edit Horizon's settings and
-  restart its web server.
-* The **Python environment Horizon runs under** (its virtualenv or the system
-  Python for packaged installs). Every command below must use *that* interpreter
-  and pip — installing Sextant into a different environment will not work.
-* An **Anthropic API key** with access to the configured model.
+    parent/
+    ├── horizon/            # the Horizon source tree (has manage.py)
+    └── horizon-sextant/    # this repo
 
-Throughout, two paths depend on your deployment. Find yours before you start:
+A Horizon plugin is *not* copied into the ``horizon`` tree. ``pip install``
+puts the ``sextant`` package on Horizon's Python path; a single "enabled" file
+wires it into the dashboard, and Horizon imports the rest from the installed
+package. The only file that lands in the ``horizon`` tree is that enabled file.
 
-* ``<horizon-src>`` — the Horizon source tree containing ``manage.py`` and the
-  ``openstack_dashboard/`` package.
+Every command must use **the Python environment that runs your Horizon**. If
+your checkout uses a virtualenv, activate it first; otherwise use whatever
+``python``/``pip`` you launch Horizon with.
 
-  * devstack: ``/opt/stack/horizon``
-  * packaged (RHEL/CentOS): ``/usr/share/openstack-dashboard``
-  * packaged (Ubuntu/Debian): ``/usr/share/openstack-dashboard``
+You also need an **Anthropic API key** with access to the configured model.
 
-* ``<local-settings>`` — Horizon's editable settings file.
+Run these from the parent directory that holds both trees.
 
-  * devstack: ``/opt/stack/horizon/openstack_dashboard/local/local_settings.py``
-  * packaged (RHEL): ``/etc/openstack-dashboard/local_settings``
-  * packaged (Ubuntu): ``/etc/openstack-dashboard/local_settings.py``
+1. **Install the plugin into Horizon's Python environment**::
 
-Steps
------
-
-1. **Install the package into Horizon's Python environment.** From this repo's
-   root (activate Horizon's virtualenv first if it has one)::
-
+     cd horizon-sextant
      pip install .
 
-2. **Register the plugin.** Horizon auto-discovers plugins from "enabled" files.
-   Copy Sextant's into Horizon's local enabled directory::
+   Then confirm it imported into the right place::
+
+     python -c "import sextant, sextant.agent.loop; print('ok', sextant.__file__)"
+
+   You should see ``ok`` and a path ending in ``.../site-packages/sextant/__init__.py``.
+   If it errors, the wrong ``pip``/``python`` was used — fix that before going on.
+
+   (Use ``pip install -e .`` instead if you want edits in ``horizon-sextant`` to
+   take effect on restart without reinstalling.)
+
+2. **Register the plugin** — copy the one enabled file into Horizon's local
+   enabled directory::
 
      cp sextant/enabled/_9010_sextant.py \
-        <horizon-src>/openstack_dashboard/local/enabled/
+        ../horizon/openstack_dashboard/local/enabled/
 
    (The ``_9010_`` prefix controls load order; leave it unless it collides with
    an existing file.)
 
-3. **Configure the API key.** Add to ``<local-settings>``::
+3. **Configure the API key** — add to
+   ``../horizon/openstack_dashboard/local/local_settings.py``::
 
      SEXTANT = {
          "api_key": "sk-ant-...",      # or omit and set ANTHROPIC_API_KEY in the env
@@ -94,26 +95,35 @@ Steps
    drop ``api_key`` and export ``ANTHROPIC_API_KEY`` in the web server's
    environment instead.
 
-4. **Restart the Horizon web server.** Whichever your deployment uses::
+4. **Restart Horizon.**
 
-     sudo systemctl restart httpd          # RHEL/CentOS/Fedora (Apache)
-     # or
-     sudo systemctl restart apache2        # Ubuntu/Debian (Apache)
+   * Dev server: stop it and re-run ``python manage.py runserver`` from the
+     ``horizon`` dir.
+   * Apache/mod_wsgi (packaged installs)::
 
-   (No ``collectstatic``/``compress`` step is needed — the panel's CSS and JS
-   are inlined in its Django template, so it ships no separate static assets.)
+       sudo systemctl restart httpd          # RHEL/CentOS/Fedora
+       # or
+       sudo systemctl restart apache2        # Ubuntu/Debian
+
+   No ``collectstatic``/``compress`` step is needed — the panel's CSS and JS are
+   inlined in its Django template, so it ships no separate static assets.
 
 5. **Verify.** Log in to Horizon as an admin-capable user. A **Sextant**
    dashboard appears in the left nav with an **Assistant** panel. Open it and
    ask, e.g., *"list all instances in ERROR state"*. If the tools error, see the
    note under Requirements about ``api.*`` version differences.
 
+Packaged installs (RHEL/Ubuntu) follow the same steps; the paths differ —
+``horizon`` lives at ``/usr/share/openstack-dashboard`` and local settings at
+``/etc/openstack-dashboard/local_settings``.
+
 Upgrading or uninstalling
 -------------------------
 
-* **Upgrade**: ``pip install --upgrade .`` and restart the web server.
-* **Uninstall**: remove ``<horizon-src>/openstack_dashboard/local/enabled/_9010_sextant.py``,
-  ``pip uninstall horizon-sextant``, and restart the web server.
+* **Upgrade**: ``pip install --upgrade .`` and restart Horizon.
+* **Uninstall**: remove
+  ``../horizon/openstack_dashboard/local/enabled/_9010_sextant.py``,
+  ``pip uninstall horizon-sextant``, and restart Horizon.
 
 Requirements & assumptions
 ==========================
