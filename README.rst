@@ -117,6 +117,57 @@ Packaged installs (RHEL/Ubuntu) follow the same steps; the paths differ —
 ``horizon`` lives at ``/usr/share/openstack-dashboard`` and local settings at
 ``/etc/openstack-dashboard/local_settings``.
 
+Local dev setup (tox runserver against a devstack VM)
+-----------------------------------------------------
+
+A common dev layout: OpenStack runs on a **devstack VM**, and you run a **local
+Horizon checkout** on your workstation, pointed at the VM's Keystone via
+``OPENSTACK_HOST`` in ``local_settings.py``. Attaching Sextant this way touches
+only your local checkout — the VM is never modified, and every OpenStack call
+still goes to the VM with your login token, exactly as Horizon already does.
+
+This checkout is launched with ``tox -e runserver``, so the Python environment
+Horizon actually uses is the tox venv at ``horizon/.tox/runserver`` — that is
+where Sextant must be installed (not your system or user ``pip``). Paths below
+assume ``horizon`` and ``horizon-sextant`` side by side.
+
+1. **Install into the runserver venv** (editable, so your edits apply on the
+   next restart). Use the **absolute path** to your ``horizon-sextant`` checkout
+   so the install doesn't depend on your current directory — an editable install
+   records the path you give it::
+
+     horizon/.tox/runserver/bin/pip install -e /full/path/to/horizon-sextant
+
+2. **Verify it imports with settings loaded.** A bare
+   ``python -c "import sextant.agent.loop"`` will fail — ``tools.py`` imports
+   ``openstack_dashboard.api`` at module load, which needs Django settings. Go
+   through ``manage.py`` instead::
+
+     horizon/.tox/runserver/bin/python horizon/manage.py shell \
+       -c "import sextant.agent.loop; print('ok')"
+
+3. **Register the plugin**::
+
+     cp horizon-sextant/sextant/enabled/_9010_sextant.py \
+        horizon/openstack_dashboard/local/enabled/
+
+4. **Configure the key in** ``local_settings.py`` (see the ``SEXTANT`` block
+   above). Put the key here, **not** in a shell environment variable: tox only
+   forwards allowlisted vars into the venv (``passenv``), so an exported
+   ``ANTHROPIC_API_KEY`` will usually not reach the running server.
+
+5. **Run it** from the ``horizon`` dir::
+
+     tox -e runserver
+
+Notes:
+
+* ``tox -re runserver`` (recreate) rebuilds the venv from scratch and **wipes
+  the Sextant install** — re-run step 1 afterward. A plain ``tox -e runserver``
+  does not recreate, so this only bites after an explicit ``-r``.
+* If the ``anthropic`` dependency ends up missing from the venv, install it
+  directly: ``horizon/.tox/runserver/bin/pip install anthropic``.
+
 Upgrading or uninstalling
 -------------------------
 
