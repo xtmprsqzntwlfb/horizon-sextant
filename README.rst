@@ -94,22 +94,16 @@ Steps
    drop ``api_key`` and export ``ANTHROPIC_API_KEY`` in the web server's
    environment instead.
 
-4. **Collect and compress static assets** so the panel's JS/CSS are served.
-   Run from ``<horizon-src>`` with Horizon's interpreter::
-
-     cd <horizon-src>
-     python manage.py collectstatic --noinput
-     python manage.py compress --force
-
-   (Skipping this is the most common reason the panel loads blank.)
-
-5. **Restart the Horizon web server.** Whichever your deployment uses::
+4. **Restart the Horizon web server.** Whichever your deployment uses::
 
      sudo systemctl restart httpd          # RHEL/CentOS/Fedora (Apache)
      # or
      sudo systemctl restart apache2        # Ubuntu/Debian (Apache)
 
-6. **Verify.** Log in to Horizon as an admin-capable user. A **Sextant**
+   (No ``collectstatic``/``compress`` step is needed — the panel's CSS and JS
+   are inlined in its Django template, so it ships no separate static assets.)
+
+5. **Verify.** Log in to Horizon as an admin-capable user. A **Sextant**
    dashboard appears in the left nav with an **Assistant** panel. Open it and
    ask, e.g., *"list all instances in ERROR state"*. If the tools error, see the
    note under Requirements about ``api.*`` version differences.
@@ -117,9 +111,9 @@ Steps
 Upgrading or uninstalling
 -------------------------
 
-* **Upgrade**: ``pip install --upgrade .``, then re-run step 4 and restart.
+* **Upgrade**: ``pip install --upgrade .`` and restart the web server.
 * **Uninstall**: remove ``<horizon-src>/openstack_dashboard/local/enabled/_9010_sextant.py``,
-  ``pip uninstall horizon-sextant``, re-run step 4, and restart.
+  ``pip uninstall horizon-sextant``, and restart the web server.
 
 Requirements & assumptions
 ==========================

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load i18n static %}
+{% load i18n %}
 
 {% block title %}{% trans "Sextant Assistant" %}{% endblock %}
 
@@ -8,7 +8,83 @@
 {% endblock %}
 
 {% block main %}
-<link rel="stylesheet" href="{% static 'sextant/css/assistant.css' %}">
+<style>
+  .sextant-assistant {
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sextant-intro {
+    color: #555;
+    font-size: 13px;
+  }
+  .sextant-examples {
+    margin-top: 6px;
+  }
+  .sextant-example {
+    background: #f0f2f5;
+    border: 1px solid #d6d9de;
+    border-radius: 14px;
+    padding: 3px 10px;
+    margin: 2px 4px 2px 0;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .sextant-log {
+    border: 1px solid #dcdee2;
+    border-radius: 6px;
+    padding: 12px;
+    min-height: 300px;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: #fff;
+  }
+  .sextant-msg {
+    padding: 8px 12px;
+    margin: 6px 0;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.45;
+  }
+  .sextant-user {
+    background: #e8f0fe;
+    align-self: flex-end;
+    margin-left: 60px;
+  }
+  .sextant-assistant.sextant-msg,
+  .sextant-msg.sextant-assistant {
+    background: #f7f8fa;
+    margin-right: 60px;
+  }
+  .sextant-error {
+    background: #fdecea;
+    color: #a12622;
+  }
+  .sextant-tool {
+    font-family: monospace;
+    font-size: 12px;
+    color: #6b7280;
+    margin: 2px 0 2px 8px;
+  }
+  .sextant-tool-error {
+    color: #a12622;
+  }
+  .sextant-form {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  #sextant-input {
+    flex: 1;
+    resize: vertical;
+    padding: 8px;
+    border: 1px solid #ccd0d6;
+    border-radius: 6px;
+    font-family: inherit;
+  }
+</style>
 
 <div id="sextant-assistant" class="sextant-assistant">
   <div class="sextant-intro">
@@ -30,7 +106,138 @@
 </div>
 
 <script>
-  window.SEXTANT_STREAM_URL = "{% url 'horizon:sextant:assistant:stream' %}";
+  /* Minimal SSE chat client, inlined so the plugin ships no static assets
+   * (no collectstatic / compress step). EventSource only supports GET, so we
+   * POST with fetch() and parse the text/event-stream body ourselves. */
+  (function () {
+    "use strict";
+
+    var STREAM_URL = "{% url 'horizon:sextant:assistant:stream' %}";
+    var log = document.getElementById("sextant-log");
+    var form = document.getElementById("sextant-form");
+    var input = document.getElementById("sextant-input");
+    var sendBtn = document.getElementById("sextant-send");
+
+    // Conversation history sent each turn (user/assistant text only).
+    var history = [];
+
+    function getCookie(name) {
+      var m = document.cookie.match("(^|;)\\s*" + name + "\\s*=\\s*([^;]+)");
+      return m ? m.pop() : "";
+    }
+
+    function el(tag, cls, text) {
+      var e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    }
+
+    function addBubble(role) {
+      var bubble = el("div", "sextant-msg sextant-" + role);
+      log.appendChild(bubble);
+      log.scrollTop = log.scrollHeight;
+      return bubble;
+    }
+
+    function addToolNote(name, isError) {
+      var note = el("div", "sextant-tool" + (isError ? " sextant-tool-error" : ""),
+        (isError ? "⚠ tool " : "→ ") + name);
+      log.appendChild(note);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function setBusy(busy) {
+      sendBtn.disabled = busy;
+      input.disabled = busy;
+    }
+
+    function handleEvent(evt, assistantBubble) {
+      switch (evt.type) {
+        case "token":
+          assistantBubble.textContent += evt.text;
+          log.scrollTop = log.scrollHeight;
+          break;
+        case "tool_call":
+          addToolNote(evt.name, false);
+          break;
+        case "tool_result":
+          if (evt.is_error) addToolNote(evt.name + " (error)", true);
+          break;
+        case "error":
+          assistantBubble.classList.add("sextant-error");
+          assistantBubble.textContent += "\n[error] " + evt.message;
+          break;
+        case "done":
+          break;
+      }
+    }
+
+    function send(message) {
+      history.push({ role: "user", content: message });
+      addBubble("user").textContent = message;
+
+      var assistantBubble = addBubble("assistant");
+      setBusy(true);
+
+      fetch(STREAM_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken")
+        },
+        body: JSON.stringify({ messages: history })
+      }).then(function (resp) {
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        var reader = resp.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = "";
+
+        function pump() {
+          return reader.read().then(function (r) {
+            if (r.done) {
+              history.push({ role: "assistant", content: assistantBubble.textContent });
+              setBusy(false);
+              return;
+            }
+            buffer += decoder.decode(r.value, { stream: true });
+            var frames = buffer.split("\n\n");
+            buffer = frames.pop(); // keep incomplete trailing frame
+            frames.forEach(function (frame) {
+              var line = frame.trim();
+              if (line.indexOf("data:") !== 0) return;
+              try {
+                handleEvent(JSON.parse(line.slice(5).trim()), assistantBubble);
+              } catch (e) { /* ignore malformed frame */ }
+            });
+            return pump();
+          });
+        }
+        return pump();
+      }).catch(function (err) {
+        assistantBubble.classList.add("sextant-error");
+        assistantBubble.textContent += "\n[error] " + err.message;
+        setBusy(false);
+      });
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var msg = input.value.trim();
+      if (!msg) return;
+      input.value = "";
+      send(msg);
+    });
+
+    // Example chips prefill the box.
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".sextant-example"),
+      function (btn) {
+        btn.addEventListener("click", function () {
+          input.value = btn.textContent;
+          input.focus();
+        });
+      });
+  })();
 </script>
-<script src="{% static 'sextant/js/assistant.js' %}"></script>
 {% endblock %}

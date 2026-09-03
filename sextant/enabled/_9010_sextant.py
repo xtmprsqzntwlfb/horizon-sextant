@@ -24,8 +24,5 @@ DASHBOARD = "sextant"
 # Not the default landing dashboard.
 DEFAULT = False
 
-# Add our app so Horizon imports its dashboard.py / panel.py and serves static.
+# Add our app so Horizon imports its dashboard.py / panel.py.
 ADD_INSTALLED_APPS = ["sextant"]
-
-# Serve the panel's static assets.
-AUTO_DISCOVER_STATIC_FILES = True

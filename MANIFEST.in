@@ -1,4 +1,3 @@
 recursive-include sextant/templates *.html
-recursive-include sextant/static *.js *.css
 recursive-include sextant/enabled *.py
 include README.rst requirements.txt LICENSE
