@@ -21,8 +21,12 @@ from sextant.dashboard import Sextant
 class Assistant(horizon.Panel):
     name = _("Assistant")
     slug = "assistant"
-    # URLs for this panel live in sextant/urls.py
-    urls = "sextant.urls"
+    # URLs for this panel live in sextant/panel_urls.py. It must NOT be named
+    # sextant/urls.py: the dashboard package is "sextant", and Horizon would
+    # then pick that module up as the *dashboard's* own default URLs too,
+    # sharing (and mutating) the same urlpatterns list and creating a
+    # self-referential include -> RecursionError at startup.
+    urls = "sextant.panel_urls"
 
 
 Sextant.register(Assistant)
