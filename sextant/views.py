@@ -22,6 +22,7 @@ import json
 import logging
 
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
+from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from horizon import views
@@ -35,6 +36,11 @@ MAX_MESSAGES = 40
 MAX_CHARS = 20000
 
 
+# Ensure the CSRF cookie is set when the page loads so the JS fetch can send it.
+# method_decorator adapts the function-view decorator to the class's dispatch
+# method (applying ensure_csrf_cookie to dispatch directly would pass ``self``
+# where it expects ``request``).
+@method_decorator(ensure_csrf_cookie, name="dispatch")
 class IndexView(views.HorizonTemplateView):
     template_name = "sextant/index.html"
     page_title = "Sextant Assistant"
@@ -96,7 +102,3 @@ def stream(request):
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"  # disable nginx buffering
     return response
-
-
-# Ensure the CSRF cookie is set when the page loads so the JS fetch can send it.
-IndexView.dispatch = ensure_csrf_cookie(IndexView.dispatch)
